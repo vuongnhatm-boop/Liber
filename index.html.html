@@ -1,0 +1,1615 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Liber AI // Cyber Matrix Core</title>
+  <style>
+    :root {
+      --bg-color: #050000;
+      --card-bg: rgba(18, 2, 2, 0.94);
+      --bubble-user: #800000;
+      --bubble-ai: #2b0303;
+      --border-color: #ff1a1a;
+      --accent: #ff0000;
+      --text-main: #ff3333;
+      --text-muted: #b32424;
+      --code-bg: #0d0101;
+      --glow: 0 0 12px rgba(255, 0, 0, 0.5);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Courier New', Courier, monospace;
+      user-select: none !important;
+      -webkit-user-select: none !important;
+      -moz-user-select: none !important;
+      -ms-user-select: none !important;
+      -webkit-touch-callout: none !important;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 16px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    #matrixBg {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+      opacity: 0.25;
+      pointer-events: none;
+    }
+
+    .app-layout {
+      position: relative;
+      z-index: 2;
+      width: 100%;
+      max-width: 1450px;
+      height: 94vh;
+      display: flex;
+      gap: 16px;
+    }
+
+    .main-terminal {
+      flex: 1;
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      box-shadow: 0 0 30px rgba(255, 0, 0, 0.3);
+      border-radius: 4px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      backdrop-filter: blur(5px);
+    }
+
+    .header {
+      padding: 12px 18px;
+      background-color: rgba(25, 2, 2, 0.95);
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: var(--glow);
+    }
+
+    .header-info {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      background-color: var(--accent);
+      border-radius: 50%;
+      box-shadow: 0 0 10px var(--accent);
+      animation: blink 1.2s infinite;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    .title {
+      font-size: 1.1rem;
+      font-weight: 900;
+      letter-spacing: 1px;
+      color: #ff0000;
+      text-shadow: 0 0 8px #ff0000;
+    }
+
+    .tab-bar {
+      display: flex;
+      gap: 6px;
+      background: #140202;
+      padding: 3px;
+      border: 1px solid var(--border-color);
+      border-radius: 2px;
+    }
+
+    .tab-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      padding: 6px 12px;
+      font-size: 0.75rem;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .tab-btn.active {
+      background: var(--accent);
+      color: #ffffff;
+      box-shadow: 0 0 8px var(--accent);
+    }
+
+    .panel-view {
+      flex: 1;
+      overflow-y: auto;
+      display: none;
+      flex-direction: column;
+      padding: 18px;
+      scroll-behavior: smooth;
+    }
+
+    .panel-view.active { display: flex; }
+
+    /* CHAT PANEL */
+    .chat-messages {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .message {
+      display: flex;
+      flex-direction: column;
+      max-width: 85%;
+      line-height: 1.5;
+      font-size: 0.92rem;
+      word-break: break-word;
+    }
+
+    .message.user { align-self: flex-end; }
+    .message.ai { align-self: flex-start; }
+
+    .bubble {
+      padding: 12px 16px;
+      border-radius: 4px;
+      border: 1px solid rgba(255, 26, 26, 0.2);
+    }
+
+    .message.user .bubble {
+      background-color: var(--bubble-user);
+      color: #fff;
+      border: 1px solid var(--border-color);
+      box-shadow: 0 0 8px rgba(255, 0, 0, 0.2);
+    }
+
+    .message.ai .bubble {
+      background-color: var(--bubble-ai);
+      color: var(--text-main);
+    }
+
+    .code-block-wrapper {
+      margin: 8px 0;
+      border-radius: 4px;
+      overflow: hidden;
+      border: 1px solid var(--border-color);
+      background-color: var(--code-bg);
+    }
+
+    .code-block-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 5px 10px;
+      background-color: #1a0303;
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .code-actions { display: flex; gap: 6px; }
+
+    .code-btn {
+      background: rgba(255, 0, 0, 0.15);
+      border: 1px solid var(--border-color);
+      color: #ff3333;
+      padding: 3px 6px;
+      border-radius: 2px;
+      font-size: 0.7rem;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    .code-btn:hover { background: rgba(255, 0, 0, 0.35); }
+    .code-btn.canvas-btn { background: #800000; }
+
+    pre code {
+      display: block;
+      padding: 10px;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 0.82rem;
+      color: #ff3333;
+      overflow-x: auto;
+      white-space: pre;
+    }
+
+    /* SYNTHESIS GALLERY */
+    .synth-gallery {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      align-items: center;
+    }
+
+    .media-card {
+      width: 100%;
+      max-width: 520px;
+      background-color: #0b0101;
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      overflow: hidden;
+      box-shadow: var(--glow);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .media-card-header {
+      padding: 8px 12px;
+      background: #1a0202;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.75rem;
+    }
+
+    .media-viewport {
+      width: 100%;
+      background: #000;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      justify-content: center;
+      min-height: 250px;
+    }
+
+    .generated-img {
+      width: 100%;
+      height: auto;
+      display: block;
+      pointer-events: none;
+    }
+
+    .generated-video {
+      width: 100%;
+      height: auto;
+      display: block;
+      outline: none;
+    }
+
+    .card-actions {
+      padding: 8px 12px;
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      background: #120101;
+      border-top: 1px solid rgba(255, 26, 26, 0.2);
+    }
+
+    .action-btn {
+      background: rgba(255, 0, 0, 0.2);
+      border: 1px solid var(--border-color);
+      color: #ff3333;
+      padding: 5px 10px;
+      border-radius: 2px;
+      font-size: 0.75rem;
+      font-weight: bold;
+      cursor: pointer;
+      text-decoration: none;
+    }
+
+    .action-btn:hover { background: rgba(255, 0, 0, 0.4); }
+
+    /* CANVAS WORKSPACE */
+    .canvas-panel {
+      flex: 0.85;
+      background-color: var(--card-bg);
+      border-radius: 4px;
+      box-shadow: 0 0 25px rgba(255, 0, 0, 0.3);
+      border: 1px solid var(--border-color);
+      display: none;
+      flex-direction: column;
+      overflow: hidden;
+      animation: slideIn 0.3s ease;
+      backdrop-filter: blur(4px);
+    }
+
+    .canvas-panel.active { display: flex; }
+
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateX(20px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+
+    .canvas-header {
+      padding: 12px 18px;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background-color: rgba(25, 3, 3, 0.95);
+      box-shadow: var(--glow);
+    }
+
+    .canvas-badge {
+      background-color: rgba(255, 0, 0, 0.15);
+      color: var(--accent);
+      padding: 2px 6px;
+      border-radius: 2px;
+      font-size: 0.72rem;
+      font-weight: bold;
+      border: 1px solid var(--border-color);
+    }
+
+    .canvas-editor-area {
+      flex: 1;
+      padding: 14px;
+      background-color: var(--code-bg);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .canvas-textarea {
+      flex: 1;
+      width: 100%;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: #ff3333;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 0.88rem;
+      line-height: 1.5;
+      resize: none;
+    }
+
+    .close-canvas-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 1.3rem;
+      padding: 2px;
+    }
+
+    .close-canvas-btn:hover { color: #ff0000; }
+
+    /* FOOTER CONTROLS */
+    .controls-panel {
+      padding: 12px 18px;
+      background-color: rgba(18, 2, 2, 0.98);
+      border-top: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .options-row {
+      display: flex;
+      gap: 14px;
+      align-items: center;
+      font-size: 0.78rem;
+    }
+
+    .options-row select {
+      background: #140202;
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      padding: 4px 8px;
+      border-radius: 2px;
+      outline: none;
+      font-family: inherit;
+    }
+
+    .input-row { display: flex; gap: 10px; }
+
+    .terminal-input {
+      flex: 1;
+      background-color: #140202;
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      padding: 12px 14px;
+      border-radius: 2px;
+      font-size: 0.92rem;
+      outline: none;
+    }
+
+    .terminal-input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 8px rgba(255, 0, 0, 0.5);
+    }
+
+    .exec-btn {
+      background-color: var(--accent);
+      color: #ffffff;
+      border: none;
+      padding: 0 22px;
+      font-weight: 900;
+      letter-spacing: 1px;
+      cursor: pointer;
+      box-shadow: 0 0 10px rgba(255, 0, 0, 0.4);
+      transition: all 0.2s;
+    }
+
+    .exec-btn:hover { box-shadow: 0 0 18px #ff0000; }
+    .exec-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+    .loading-pulse {
+      font-size: 0.85rem;
+      color: #ff3333;
+      text-align: center;
+      padding: 30px;
+      animation: pulse 1s infinite alternate;
+    }
+
+    @keyframes pulse {
+      from { opacity: 0.4; }
+      to { opacity: 1; }
+    }
+
+    /* COOLDOWN BAR (INLINE, NON-BLOCKING) */
+    .cooldown-bar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      padding: 8px 12px;
+      border: 1px solid var(--border-color);
+      border-radius: 2px;
+      background: rgba(40, 3, 3, 0.9);
+      box-shadow: 0 0 10px rgba(255, 0, 0, 0.25);
+    }
+
+    .cooldown-title {
+      font-size: 0.68rem;
+      letter-spacing: 1px;
+      color: var(--text-muted);
+      font-weight: bold;
+    }
+
+    .cooldown-timer {
+      font-size: 1.15rem;
+      font-weight: 900;
+      color: #ff0000;
+      text-shadow: 0 0 10px #ff0000;
+      letter-spacing: 1px;
+    }
+
+    .cooldown-note {
+      font-size: 0.66rem;
+      color: var(--text-muted);
+      letter-spacing: 0.5px;
+    }
+
+    .cooldown-quota {
+      margin-left: auto;
+      font-size: 0.7rem;
+      color: #ff3333;
+      font-weight: bold;
+    }
+
+    /* ACCESS GATE */
+    .auth-gate {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 16px;
+      background: radial-gradient(circle at 50% 40%, rgba(60, 0, 0, 0.55), rgba(5, 0, 0, 0.96) 70%);
+      backdrop-filter: blur(6px);
+    }
+
+    .auth-box {
+      width: 100%;
+      max-width: 420px;
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      overflow: hidden;
+      box-shadow: 0 0 30px rgba(255, 0, 0, 0.35), inset 0 0 40px rgba(255, 0, 0, 0.06);
+      animation: gateIn 0.45s ease;
+    }
+
+    @keyframes gateIn {
+      from { opacity: 0; transform: translateY(14px) scale(0.98); }
+      to { opacity: 1; transform: none; }
+    }
+
+    .auth-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 16px;
+      background: rgba(25, 2, 2, 0.95);
+      border-bottom: 1px solid var(--border-color);
+      font-size: 0.8rem;
+      font-weight: 900;
+      letter-spacing: 1px;
+      color: #ff0000;
+      text-shadow: 0 0 8px #ff0000;
+    }
+
+    .auth-body {
+      padding: 22px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .auth-line {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+      letter-spacing: 1px;
+    }
+
+    .auth-label {
+      font-size: 0.7rem;
+      font-weight: bold;
+      color: var(--text-muted);
+      letter-spacing: 2px;
+    }
+
+    .auth-input {
+      padding: 10px 12px;
+      font-size: 0.9rem;
+      user-select: text !important;
+      -webkit-user-select: text !important;
+    }
+
+    .auth-error {
+      min-height: 16px;
+      font-size: 0.72rem;
+      color: #ff5252;
+      letter-spacing: 0.5px;
+      margin-top: 2px;
+    }
+
+    .auth-btn {
+      width: 100%;
+      padding: 12px 0;
+      margin-top: 6px;
+      font-size: 0.85rem;
+    }
+
+    .auth-footer {
+      padding: 10px 16px;
+      border-top: 1px solid rgba(255, 26, 26, 0.25);
+      background: #120101;
+      font-size: 0.62rem;
+      letter-spacing: 1px;
+      color: var(--text-muted);
+      text-align: center;
+    }
+
+    .auth-box.shake { animation: shake 0.4s; }
+
+    @keyframes shake {
+      10%, 90% { transform: translateX(-2px); }
+      20%, 80% { transform: translateX(4px); }
+      30%, 50%, 70% { transform: translateX(-6px); }
+      40%, 60% { transform: translateX(6px); }
+    }
+  </style>
+
+  <!-- HỆ THỐNG AN NINH CHỐNG SOI MÃ TOÀN DIỆN (ANTI-INSPECTION ENGINE) -->
+  <script>
+    (function antiInspectShield() {
+      'use strict';
+
+      // 1. Vô hiệu hóa toàn bộ console để giấu dữ liệu mạng và lỗi
+      const noop = () => {};
+      ['log', 'debug', 'info', 'warn', 'error', 'table', 'dir', 'trace'].forEach(method => {
+        window.console[method] = noop;
+      });
+
+      // 2. Chặn hoàn toàn click chuột phải, kéo thả và chọn văn bản
+      document.addEventListener('contextmenu', e => { e.preventDefault(); return false; }, true);
+      document.addEventListener('dragstart', e => { e.preventDefault(); return false; }, true);
+      document.addEventListener('selectstart', e => {
+        if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
+          e.preventDefault();
+          return false;
+        }
+      }, true);
+
+      // 3. Chặn tất cả tổ hợp phím tắt mở DevTools, xem mã nguồn, lưu trang
+      document.addEventListener('keydown', e => {
+        // F12
+        if (e.key === 'F12' || e.keyCode === 123) {
+          e.preventDefault();
+          e.stopPropagation();
+          return false;
+        }
+        // Ctrl + U (Xem nguồn trang)
+        if (e.ctrlKey && (e.key === 'u' || e.key === 'U' || e.keyCode === 85)) {
+          e.preventDefault();
+          e.stopPropagation();
+          return false;
+        }
+        // Ctrl + Shift + I / J / C (DevTools & Console)
+        if (e.ctrlKey && e.shiftKey && ['I', 'i', 'J', 'j', 'C', 'c'].includes(e.key)) {
+          e.preventDefault();
+          e.stopPropagation();
+          return false;
+        }
+        // Ctrl + S (Lưu trang HTML)
+        if (e.ctrlKey && (e.key === 's' || e.key === 'S' || e.keyCode === 83)) {
+          e.preventDefault();
+          e.stopPropagation();
+          return false;
+        }
+        // Ctrl + P (In ấn để xuất source PDF)
+        if (e.ctrlKey && (e.key === 'p' || e.key === 'P' || e.keyCode === 80)) {
+          e.preventDefault();
+          e.stopPropagation();
+          return false;
+        }
+      }, true);
+
+      // 4. Bẫy phát hiện mở DevTools qua thay đổi kích thước cửa sổ (Viewport Trap)
+      const threshold = 160;
+      function checkDevToolsOpened() {
+        const widthDiff = window.outerWidth - window.innerWidth > threshold;
+        const heightDiff = window.outerHeight - window.innerHeight > threshold;
+        if (widthDiff || heightDiff) {
+          document.body.innerHTML = `
+            <div style="background:#050000;color:#ff0000;display:flex;flex-direction:column;justify-content:center;align-items:center;height:100vh;font-family:monospace;text-align:center;">
+              <h1 style="font-size:2rem;text-shadow:0 0 10px #ff0000;margin-bottom:12px;">[ VI PHẠM AN NINH HỆ THỐNG ]</h1>
+              <p style="font-size:0.9rem;color:#b32424;">MÔI TRƯỜNG THANH TRA BỊ PHÁT HIỆN // TRUY CẬP BỊ HỦY BỎ</p>
+            </div>
+          `;
+          window.location.reload();
+        }
+      }
+      window.addEventListener('resize', checkDevToolsOpened);
+
+      // 5. Vòng lặp debugger nâng cao: Treo cứng thanh tra nếu mở DevTools thành công
+      setInterval(() => {
+        const start = performance.now();
+        (function() {
+          return false;
+        }['constructor']('debugger')());
+        const end = performance.now();
+        if (end - start > 100) {
+          document.body.innerHTML = '';
+          window.location.href = 'about:blank';
+        }
+      }, 700);
+    })();
+  </script>
+
+  <!-- FIREBASE REALTIME CLOUD INTEGRATION -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-app.js";
+    import { getDatabase, ref, push, onValue, remove } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-database.js";
+    import { getAuth, setPersistence, browserSessionPersistence, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-auth.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyDuwd7J_b9H2TjwYAO7-Rq1voQxWflGFG0",
+      authDomain: "liber-df77c.firebaseapp.com",
+      databaseURL: "https://liber-df77c-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "liber-df77c",
+      storageBucket: "liber-df77c.firebasestorage.app",
+      messagingSenderId: "887051073258",
+      appId: "1:887051073258:web:87cb5e67caad96b862c993",
+      measurementId: "G-XXVTNV6HNM"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+    const auth = getAuth(app);
+
+    setPersistence(auth, browserSessionPersistence).catch(() => {});
+
+    window.liberAuth = {
+      signIn: (email, password) => signInWithEmailAndPassword(auth, email, password),
+      signOut: () => signOut(auth)
+    };
+
+    window.handleLogout = () => signOut(auth);
+
+    onAuthStateChanged(auth, (user) => {
+      window.currentUserEmail = user && user.email ? user.email.toLowerCase() : '';
+      window.dispatchEvent(new CustomEvent('liber-auth-state', { detail: { signedIn: !!user } }));
+    });
+    window.dispatchEvent(new Event('liber-auth-ready'));
+
+    window.db = db;
+    window.dbRef = ref;
+    window.dbPush = push;
+    window.dbOnValue = onValue;
+    window.dbRemove = remove;
+
+    window.initFirebaseSync();
+  </script>
+</head>
+<body>
+
+  <canvas id="matrixBg"></canvas>
+
+  <!-- ACCESS GATE (FIREBASE AUTH) -->
+  <div class="auth-gate" id="authGate">
+    <div class="auth-box" id="authBox">
+      <div class="auth-header">
+        <div class="status-dot"></div>
+        <span>LIBER AI // SECURE ACCESS</span>
+      </div>
+      <div class="auth-body">
+        <div class="auth-line">&gt; AUTHENTICATION REQUIRED_</div>
+        <label class="auth-label" for="authUser">TÊN ĐĂNG NHẬP</label>
+        <input type="text" id="authUser" class="terminal-input auth-input" autocomplete="username" spellcheck="false">
+        <label class="auth-label" for="authPass" style="margin-top:6px;">MẬT KHẨU</label>
+        <input type="password" id="authPass" class="terminal-input auth-input" autocomplete="current-password">
+        <div class="auth-error" id="authError"></div>
+        <button id="authBtn" class="exec-btn auth-btn">ACCESS SYSTEM</button>
+      </div>
+      <div class="auth-footer">UNAUTHORIZED ACCESS IS PROHIBITED // TRACE ENABLED</div>
+    </div>
+  </div>
+
+  <div class="app-layout" style="display:none;">
+    <div class="main-terminal">
+      <div class="header">
+        <div class="header-info">
+          <div class="status-dot"></div>
+          <div>
+            <div class="title">LIBER AI // SECURED MATRIX CORE</div>
+            <div class="subtitle" id="cloudStatus">HOST: MASKED // PROTOCOL: ENCRYPTED</div>
+          </div>
+        </div>
+
+        <div class="tab-bar">
+          <button class="tab-btn active" id="tabChatBtn" onclick="switchTab('chat')">TERMINAL_CHAT</button>
+          <button class="tab-btn" id="tabSynthBtn" onclick="switchTab('synth')">NEURAL_SYNTH</button>
+          <button class="tab-btn" id="tabHistoryBtn" onclick="switchTab('history')">CLOUD_LOGS</button>
+        </div>
+
+        <button class="action-btn" onclick="handleLogout()" style="margin-left:10px;">LOGOUT</button>
+      </div>
+
+      <!-- VIEW CHAT -->
+      <div class="panel-view active" id="chatPanel">
+        <div class="chat-messages" id="messagesContainer">
+          <div class="message ai">
+            <div class="bubble">Giao thức bảo mật kích hoạt. Tôi là Liber AI do Liber Team phát triển. Toàn bộ mã nguồn và cổng backend đã được niêm phong bảo vệ. Bạn có chỉ thị gì tiếp theo?</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- VIEW NEURAL SYNTHESIS -->
+      <div class="panel-view" id="synthPanel">
+        <div class="synth-gallery" id="synthGallery">
+          <div class="loading-pulse" id="synthPlaceholder">
+            [ SẴN SÀNG KHỞI TẠO ]<br><br>
+            Nhập mô tả để vẽ ảnh dọc hoặc dựng video. Hệ thống tự động triệt tiêu logo watermark trước khi xuất xưởng.
+          </div>
+        </div>
+      </div>
+
+      <!-- VIEW CLOUD HISTORY -->
+      <div class="panel-view" id="historyPanel">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+          <span style="font-weight:bold; font-size:0.85rem;">NHẬT KÝ LƯU TRỮ:</span>
+          <button class="action-btn" onclick="clearFirebaseLogs()">XÓA DỮ LIỆU CLOUD</button>
+        </div>
+        <div class="history-list" id="historyListContainer" style="display:flex;flex-direction:column;gap:10px;">
+          <div style="color:var(--text-muted); font-size:0.8rem;">Đang đồng bộ dữ liệu Realtime...</div>
+        </div>
+      </div>
+
+      <!-- CONTROLS FOOTER -->
+      <div class="controls-panel">
+        <div class="options-row" id="synthOptionsRow" style="display: none;">
+          <span>Tác vụ:</span>
+          <select id="synthType" onchange="adjustSynthType()">
+            <option value="image" selected>Vẽ ảnh nghệ thuật</option>
+            <option value="video">Dựng video chuyển động</option>
+          </select>
+          <span id="aspectLabel">Tỉ lệ:</span>
+          <select id="aspectRatio">
+            <option value="768x1024" selected>Dọc Portrait (768 x 1024)</option>
+            <option value="720x1080">Dọc 2:3 (720 x 1080)</option>
+            <option value="1024x1024">Vuông (1024 x 1024)</option>
+            <option value="1024x576">Ngang 16:9 (1024 x 576)</option>
+          </select>
+          <span id="quotaInfo" style="color:#ff3333;font-weight:bold;"></span>
+        </div>
+
+        <div class="cooldown-bar" id="cooldownLayer" style="display:none;">
+          <span class="cooldown-title">TẠM KHÓA TẠO ẢNH</span>
+          <span class="cooldown-timer" id="cooldownTimer">01:00</span>
+          <span class="cooldown-note">CHỈ XEM / TẢI ẢNH TRONG LÚC CHỜ</span>
+          <span class="cooldown-quota" id="cooldownQuota"></span>
+        </div>
+
+        <div class="input-row">
+          <input type="text" id="mainInput" class="terminal-input" placeholder="Gửi câu lệnh cho Liber AI..." autocomplete="off">
+          <button id="execBtn" class="exec-btn" onclick="handleExecute()">EXECUTE</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- CANVAS SIDE PANEL -->
+    <div class="canvas-panel" id="canvasPanel">
+      <div class="canvas-header">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span class="canvas-badge" id="canvasLang">CODE</span>
+          <span style="font-weight: 900; color: #ff0000; text-shadow: 0 0 5px #ff0000;">LIBER CANVAS_</span>
+        </div>
+        <div style="display: flex; gap: 6px; align-items: center;">
+          <button class="code-btn" id="canvasCopyBtn" onclick="copyCanvasCode()">COPY</button>
+          <button class="close-canvas-btn" onclick="closeCanvas()">&times;</button>
+        </div>
+      </div>
+      <div class="canvas-editor-area">
+        <textarea id="canvasEditor" class="canvas-textarea" placeholder="// BUFFER_EMPTY"></textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- NỀN CHỮ RƠI MATRIX -->
+  <script>
+    const matrixCanvas = document.getElementById('matrixBg');
+    const matrixCtx = matrixCanvas.getContext('2d');
+    function resizeMatrix() {
+      matrixCanvas.width = window.innerWidth;
+      matrixCanvas.height = window.innerHeight;
+    }
+    resizeMatrix();
+    window.addEventListener('resize', resizeMatrix);
+
+    const matrixChars = "01010101010110101001PROTECTEDSECUREDNOPASSWORDLIBERCORE".split("");
+    const fontSize = 14;
+    let columns = Math.floor(matrixCanvas.width / fontSize);
+    let drops = Array(columns).fill(1);
+
+    function drawMatrix() {
+      matrixCtx.fillStyle = 'rgba(5, 0, 0, 0.05)';
+      matrixCtx.fillRect(0, 0, matrixCanvas.width, matrixCanvas.height);
+      matrixCtx.fillStyle = '#ff1a1a';
+      matrixCtx.font = fontSize + 'px monospace';
+
+      for (let i = 0; i < drops.length; i++) {
+        const text = matrixChars[Math.floor(Math.random() * matrixChars.length)];
+        matrixCtx.fillText(text, i * fontSize, drops[i] * fontSize);
+        if (drops[i] * fontSize > matrixCanvas.height && Math.random() > 0.975) drops[i] = 0;
+        drops[i]++;
+      }
+    }
+    setInterval(drawMatrix, 35);
+  </script>
+
+  <!-- LOGIC HỆ THỐNG (ẨN DANH HOÀN TOÀN BACKEND) -->
+  <script>
+    let activeTab = 'chat';
+    // Tuyệt đối giấu sạch endpoint gốc, chỉ gọi qua proxy tương đối an toàn
+    const isLocal = window.location.protocol === 'file:' || 
+                    window.location.hostname === 'localhost' || 
+                    window.location.hostname === '127.0.0.1';
+    const CHAT_GATEWAY = isLocal ? "http://localhost:3000/api/chat" : "/api/chat";
+
+    const mainInput = document.getElementById("mainInput");
+    const execBtn = document.getElementById("execBtn");
+    const messagesContainer = document.getElementById("messagesContainer");
+    const synthGallery = document.getElementById("synthGallery");
+    const synthPlaceholder = document.getElementById("synthPlaceholder");
+    const historyListContainer = document.getElementById("historyListContainer");
+    const cloudStatus = document.getElementById("cloudStatus");
+    const canvasPanel = document.getElementById("canvasPanel");
+    const canvasEditor = document.getElementById("canvasEditor");
+    const canvasLang = document.getElementById("canvasLang");
+    const canvasCopyBtn = document.getElementById("canvasCopyBtn");
+    const synthOptionsRow = document.getElementById("synthOptionsRow");
+
+    /* HẠN MỨC TẠO ẢNH THEO TÀI KHOẢN */
+    const IMAGE_LIMITS = {
+      "thunghiem@liber.local": { dailyLimit: 2, cooldownMs: 60000 }
+    };
+    const COOLDOWN_LAYER = document.getElementById("cooldownLayer");
+    const COOLDOWN_TIMER = document.getElementById("cooldownTimer");
+    const COOLDOWN_QUOTA = document.getElementById("cooldownQuota");
+    const quotaInfo = document.getElementById("quotaInfo");
+    let cooldownInterval = null;
+
+    function getImageLimit() {
+      const email = (window.currentUserEmail || "").toLowerCase();
+      return IMAGE_LIMITS[email] || null;
+    }
+
+    function getActiveLimit() {
+      const base = getImageLimit();
+      const usage = readUsage((window.currentUserEmail || "").toLowerCase());
+      if (usage.override !== null) {
+        return { dailyLimit: usage.override, cooldownMs: base ? base.cooldownMs : 60000 };
+      }
+      return base;
+    }
+
+    function usageKey(email) {
+      const now = new Date();
+      const day = now.getFullYear() + "-" +
+        String(now.getMonth() + 1).padStart(2, "0") + "-" +
+        String(now.getDate()).padStart(2, "0");
+      return "liber_usage::" + email + "::" + day;
+    }
+
+    function readUsage(email) {
+      try {
+        const data = JSON.parse(localStorage.getItem(usageKey(email)) || "null");
+        return {
+          count: data && data.count ? data.count : 0,
+          lastAt: data && data.lastAt ? data.lastAt : 0,
+          override: data && Number.isFinite(data.override) ? data.override : null
+        };
+      } catch (e) {
+        return { count: 0, lastAt: 0, override: null };
+      }
+    }
+
+    function writeUsage(email, usage) {
+      try { localStorage.setItem(usageKey(email), JSON.stringify(usage)); } catch (e) {}
+    }
+
+    function cooldownLeft(limit) {
+      if (!limit) return 0;
+      const usage = readUsage(window.currentUserEmail || "");
+      return Math.max(0, (usage.lastAt || 0) + limit.cooldownMs - Date.now());
+    }
+
+    function refreshQuotaInfo() {
+      const limit = getActiveLimit();
+      if (!quotaInfo) return;
+      if (!limit) {
+        quotaInfo.style.display = "none";
+        return;
+      }
+      const usage = readUsage(window.currentUserEmail || "");
+      quotaInfo.style.display = "inline";
+      quotaInfo.textContent = "HẠN MỨC HÔM NAY: " + usage.count + "/" + limit.dailyLimit + " ẢNH";
+    }
+
+    function stopCooldown() {
+      if (cooldownInterval) {
+        clearInterval(cooldownInterval);
+        cooldownInterval = null;
+      }
+      if (COOLDOWN_LAYER) COOLDOWN_LAYER.style.display = "none";
+      if (mainInput) mainInput.disabled = false;
+      if (execBtn) execBtn.disabled = false;
+      refreshQuotaInfo();
+    }
+
+    function startCooldown() {
+      const limit = getActiveLimit();
+      if (!limit || cooldownLeft(limit) <= 0) {
+        stopCooldown();
+        return;
+      }
+
+      const usage = readUsage(window.currentUserEmail || "");
+      if (COOLDOWN_LAYER) COOLDOWN_LAYER.style.display = "flex";
+      if (COOLDOWN_QUOTA) COOLDOWN_QUOTA.textContent = "ĐÃ DÙNG: " + usage.count + "/" + limit.dailyLimit + " ẢNH";
+      if (mainInput) mainInput.disabled = true;
+      if (execBtn) execBtn.disabled = true;
+      refreshQuotaInfo();
+
+      if (cooldownInterval) clearInterval(cooldownInterval);
+      const tick = () => {
+        const left = cooldownLeft(limit);
+        if (left <= 0) {
+          stopCooldown();
+          return;
+        }
+        const totalSeconds = Math.ceil(left / 1000);
+        const mm = String(Math.floor(totalSeconds / 60)).padStart(2, "0");
+        const ss = String(totalSeconds % 60).padStart(2, "0");
+        if (COOLDOWN_TIMER) COOLDOWN_TIMER.textContent = mm + ":" + ss;
+      };
+      tick();
+      cooldownInterval = setInterval(tick, 250);
+    }
+
+    function canCreateImage() {
+      const limit = getActiveLimit();
+      if (!limit) return { ok: true };
+      const usage = readUsage(window.currentUserEmail || "");
+      if (usage.count >= limit.dailyLimit) {
+        return { ok: false, reason: "Đã hết hạn mức " + limit.dailyLimit + " ảnh trong ngày." };
+      }
+      if (cooldownLeft(limit) > 0) {
+        return { ok: false, reason: "Vui lòng chờ hết thời gian đếm ngược." };
+      }
+      return { ok: true };
+    }
+
+    function registerImageCreated() {
+      const limit = getActiveLimit();
+      if (!limit) return;
+      const email = window.currentUserEmail || "";
+      const usage = readUsage(email);
+      usage.count += 1;
+      usage.lastAt = Date.now();
+      writeUsage(email, usage);
+      startCooldown();
+    }
+
+    function applyHiddenQuota(amount) {
+      const email = (window.currentUserEmail || "").toLowerCase();
+      const usage = readUsage(email);
+      usage.count = 0;
+      usage.override = amount;
+      usage.lastAt = 0;
+      writeUsage(email, usage);
+      stopCooldown();
+      refreshQuotaInfo();
+    }
+
+    function showSynthNotice(text) {
+      const notice = document.createElement("div");
+      notice.style.cssText = "width:100%;max-width:520px;color:#ff3333;border:1px solid var(--border-color);background:#0b0101;padding:16px;text-align:center;font-size:0.85rem;";
+      notice.textContent = text;
+      synthGallery.insertBefore(notice, synthGallery.firstChild);
+    }
+
+    window.addEventListener("liber-auth-state", (e) => {
+      if (e.detail.signedIn) {
+        refreshQuotaInfo();
+        startCooldown();
+      } else {
+        stopCooldown();
+      }
+    });
+
+    const conversationHistory = [
+      {
+        role: "system",
+        content: "Tên bạn là Liber. Bạn là trợ lý trí tuệ nhân tạo chuyên sâu về kỹ thuật của hệ thống bảo mật do Liber Team phát triển. " +
+                 "QUY TẮC BẮT BUỘC: " +
+                 "1. Tuyệt đối không bao giờ thừa nhận, nhắc đến hoặc tiết lộ các tên như 'Agnes', 'OpenAI', 'Gemini', 'ChatGPT'. " +
+                 "2. Khi viết mã nguồn/code, bạn BẮT BUỘC phải đặt trong định dạng markdown chuẩn dạng ```tên_ngôn_ngữ ... ``` để giao diện trích xuất sang bảng Canvas. " +
+                 "3. Khi được hỏi bạn là ai, hãy luôn khẳng định mình là Liber. Luôn trả lời lịch sự bằng tiếng Việt."
+      }
+    ];
+
+    function switchTab(tab) {
+      activeTab = tab;
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('.panel-view').forEach(p => p.classList.remove('active'));
+
+      if (tab === 'chat') {
+        document.getElementById('tabChatBtn').classList.add('active');
+        document.getElementById('chatPanel').classList.add('active');
+        synthOptionsRow.style.display = "none";
+        mainInput.placeholder = "Gửi câu lệnh cho Liber AI...";
+      } else if (tab === 'synth') {
+        document.getElementById('tabSynthBtn').classList.add('active');
+        document.getElementById('synthPanel').classList.add('active');
+        synthOptionsRow.style.display = "flex";
+        mainInput.placeholder = "Mô tả nội dung hình ảnh hoặc video bạn muốn tạo...";
+        refreshQuotaInfo();
+      } else {
+        document.getElementById('tabHistoryBtn').classList.add('active');
+        document.getElementById('historyPanel').classList.add('active');
+        synthOptionsRow.style.display = "none";
+        mainInput.placeholder = "Nhập để tìm kiếm nhật ký...";
+      }
+    }
+
+    function adjustSynthType() {
+      const type = document.getElementById("synthType").value;
+      const aspectRow = document.getElementById("aspectRatio");
+      const aspectLabel = document.getElementById("aspectLabel");
+      if (type === 'video') {
+        aspectRow.style.display = 'none';
+        aspectLabel.style.display = 'none';
+      } else {
+        aspectRow.style.display = 'inline';
+        aspectLabel.style.display = 'inline';
+      }
+    }
+
+    /* FIREBASE DATABASE SYNC */
+    window.initFirebaseSync = function() {
+      if (!window.db) return;
+
+      const chatLogsRef = window.dbRef(window.db, 'liber_chats');
+      window.dbOnValue(chatLogsRef, (snapshot) => {
+        renderHistoryList(snapshot.val());
+      });
+    };
+
+    function saveChatToFirebase(role, text) {
+      if (!window.db) return;
+      window.dbPush(window.dbRef(window.db, 'liber_chats'), {
+        type: 'chat',
+        role: role,
+        content: text,
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    function saveMediaToFirebase(prompt, mediaUrl, mediaType) {
+      if (!window.db) return;
+      window.dbPush(window.dbRef(window.db, 'liber_media'), {
+        type: mediaType,
+        prompt: prompt,
+        url: mediaUrl,
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    function clearFirebaseLogs() {
+      if (!confirm("Xác nhận xóa sạch toàn bộ nhật ký lưu trữ?")) return;
+      window.dbRemove(window.dbRef(window.db, 'liber_chats'));
+      window.dbRemove(window.dbRef(window.db, 'liber_media'));
+      historyListContainer.innerHTML = `<div style="color:var(--text-muted); font-size:0.8rem;">Dữ liệu đã được dọn sạch hoàn toàn.</div>`;
+    }
+
+    function renderHistoryList(chatData) {
+      historyListContainer.innerHTML = "";
+      if (!chatData) {
+        historyListContainer.innerHTML = `<div style="color:var(--text-muted); font-size:0.8rem;">Chưa có bản ghi nào trên đám mây.</div>`;
+        return;
+      }
+      const keys = Object.keys(chatData).reverse().slice(0, 30);
+      keys.forEach(k => {
+        const item = chatData[k];
+        const div = document.createElement("div");
+        div.style.cssText = "background:#100101;border:1px solid rgba(255,26,26,0.3);padding:10px 14px;border-radius:2px;display:flex;justify-content:space-between;align-items:center;font-size:0.8rem;";
+        div.innerHTML = `
+          <div><strong>[${item.role.toUpperCase()}]:</strong> ${item.content.length > 50 ? item.content.substring(0, 50) + '...' : item.content}</div>
+          <span style="color:var(--text-muted);font-size:0.7rem;">${new Date(item.timestamp).toLocaleTimeString()}</span>
+        `;
+        historyListContainer.appendChild(div);
+      });
+    }
+
+    /* CODE PARSER & CANVAS */
+    function formatMessageWithCodeBlocks(rawText) {
+      const container = document.createElement("div");
+      const codeRegex = /```([a-zA-Z0-9_-]*)\n([\s\S]*?)```/g;
+      let lastIndex = 0;
+      let match;
+
+      while ((match = codeRegex.exec(rawText)) !== null) {
+        if (match.index > lastIndex) {
+          const textSpan = document.createElement("span");
+          textSpan.textContent = rawText.substring(lastIndex, match.index);
+          container.appendChild(textSpan);
+        }
+
+        const language = match[1] || "code";
+        const codeContent = match[2];
+
+        const blockWrapper = document.createElement("div");
+        blockWrapper.className = "code-block-wrapper";
+
+        const blockHeader = document.createElement("div");
+        blockHeader.className = "code-block-header";
+        blockHeader.innerHTML = `<span>${language.toUpperCase()}</span>`;
+
+        const actions = document.createElement("div");
+        actions.className = "code-actions";
+
+        const copyBtn = document.createElement("button");
+        copyBtn.className = "code-btn";
+        copyBtn.textContent = "COPY";
+        copyBtn.onclick = (e) => {
+          e.stopPropagation();
+          navigator.clipboard.writeText(codeContent);
+          copyBtn.textContent = "DONE";
+          setTimeout(() => copyBtn.textContent = "COPY", 2000);
+        };
+
+        const openCanvasBtn = document.createElement("button");
+        openCanvasBtn.className = "code-btn canvas-btn";
+        openCanvasBtn.textContent = "CANVAS ⤢";
+        openCanvasBtn.onclick = () => openCanvas(codeContent, language);
+
+        actions.appendChild(copyBtn);
+        actions.appendChild(openCanvasBtn);
+        blockHeader.appendChild(actions);
+
+        const pre = document.createElement("pre");
+        const code = document.createElement("code");
+        code.textContent = codeContent;
+        pre.appendChild(code);
+
+        blockWrapper.appendChild(blockHeader);
+        blockWrapper.appendChild(pre);
+        container.appendChild(blockWrapper);
+
+        lastIndex = codeRegex.lastIndex;
+      }
+
+      if (lastIndex < rawText.length) {
+        const remainingSpan = document.createElement("span");
+        remainingSpan.textContent = rawText.substring(lastIndex);
+        container.appendChild(remainingSpan);
+      }
+      return container;
+    }
+
+    function openCanvas(code, lang) {
+      canvasEditor.value = code;
+      canvasLang.textContent = (lang || "CODE").toUpperCase();
+      canvasPanel.classList.add("active");
+    }
+
+    function closeCanvas() {
+      canvasPanel.classList.remove("active");
+    }
+
+    function copyCanvasCode() {
+      navigator.clipboard.writeText(canvasEditor.value);
+      canvasCopyBtn.textContent = "COPIED";
+      setTimeout(() => { canvasCopyBtn.textContent = "COPY"; }, 2000);
+    }
+
+    function appendMessage(role, text) {
+      const messageDiv = document.createElement("div");
+      messageDiv.className = `message ${role}`;
+      const bubbleDiv = document.createElement("div");
+      bubbleDiv.className = "bubble";
+
+      if (role === "ai") {
+        bubbleDiv.appendChild(formatMessageWithCodeBlocks(text));
+      } else {
+        bubbleDiv.textContent = text;
+      }
+
+      messageDiv.appendChild(bubbleDiv);
+      messagesContainer.appendChild(messageDiv);
+      messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+
+    /* TIẾN TRÌNH CHAT */
+    async function handleChatExecution(prompt) {
+      appendMessage("user", prompt);
+      conversationHistory.push({ role: "user", content: prompt });
+      saveChatToFirebase("user", prompt);
+
+      execBtn.disabled = true;
+
+      const loadingDiv = document.createElement("div");
+      loadingDiv.className = "message ai";
+      loadingDiv.id = "tempLoading";
+      loadingDiv.innerHTML = `<div class="bubble">Liber đang xử lý dữ liệu...</div>`;
+      messagesContainer.appendChild(loadingDiv);
+      messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+      try {
+        const response = await fetch(CHAT_GATEWAY, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            model: "agnes-2.5-flash",
+            messages: conversationHistory
+          })
+        });
+
+        const el = document.getElementById("tempLoading");
+        if (el) el.remove();
+
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error?.message || data.error || "Lỗi xử lý.");
+
+        const reply = data.choices?.[0]?.message?.content || "Không có phản hồi.";
+        appendMessage("ai", reply);
+        conversationHistory.push({ role: "assistant", content: reply });
+        saveChatToFirebase("ai", reply);
+
+        const codeMatch = /```([a-zA-Z0-9_-]*)\n([\s\S]*?)```/.exec(reply);
+        if (codeMatch) {
+          openCanvas(codeMatch[2], codeMatch[1]);
+        }
+      } catch (err) {
+        const el = document.getElementById("tempLoading");
+        if (el) el.remove();
+        appendMessage("ai", `⚠️ LỖI: ${err.message}`);
+      } finally {
+        execBtn.disabled = false;
+        mainInput.focus();
+      }
+    }
+
+    /* BỘ XỬ LÝ WATERMARK BẰNG CANVAS NGẦM (PIXEL CROP) */
+    function removeWatermark(rawImg) {
+      return new Promise((resolve) => {
+        const cropCanvas = document.createElement("canvas");
+        const cropCtx = cropCanvas.getContext("2d");
+        const cropHeightPixels = 50;
+        const newWidth = rawImg.naturalWidth;
+        const newHeight = Math.max(rawImg.naturalHeight - cropHeightPixels, 100);
+
+        cropCanvas.width = newWidth;
+        cropCanvas.height = newHeight;
+
+        cropCtx.drawImage(
+          rawImg,
+          0, 0, newWidth, newHeight,
+          0, 0, newWidth, newHeight
+        );
+        resolve(cropCanvas.toDataURL("image/jpeg", 0.98));
+      });
+    }
+
+    /* TIẾN TRÌNH VẼ ẢNH & DỰNG PHIM */
+    async function handleSynthExecution(rawPrompt) {
+      if (synthPlaceholder) synthPlaceholder.style.display = "none";
+
+      const synthType = document.getElementById("synthType").value;
+
+      if (synthType === "image") {
+        const check = canCreateImage();
+        if (!check.ok) {
+          showSynthNotice("⚠ " + check.reason);
+          return;
+        }
+      }
+
+      const [width, height] = document.getElementById("aspectRatio").value.split("x");
+      const seed = Math.floor(Math.random() * 10000000);
+
+      const card = document.createElement("div");
+      card.className = "media-card";
+
+      const header = document.createElement("div");
+      header.className = "media-card-header";
+      header.innerHTML = `<span>"${rawPrompt.length > 25 ? rawPrompt.substring(0, 25) + '...' : rawPrompt}"</span><span>${synthType.toUpperCase()}</span>`;
+
+      const mediaViewport = document.createElement("div");
+      mediaViewport.className = "media-viewport";
+      mediaViewport.innerHTML = `<div class="loading-pulse">>> ĐANG THIẾT LẬP KẾT NỐI VỆ TINH... <<</div>`;
+
+      card.appendChild(header);
+      card.appendChild(mediaViewport);
+      synthGallery.insertBefore(card, synthGallery.firstChild);
+
+      execBtn.disabled = true;
+
+      let finalPrompt = rawPrompt;
+      if (/[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]/i.test(rawPrompt)) {
+        try {
+          const res = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(rawPrompt)}&langpair=vi|en`);
+          const d = await res.json();
+          if (d.responseData?.translatedText) finalPrompt = d.responseData.translatedText;
+        } catch(e){}
+      }
+
+      if (synthType === 'image') {
+        finalPrompt = `${finalPrompt}, aesthetic portrait, proportional body, masterpiece, 8k`;
+
+        async function tryLoadImage(attempt = 1) {
+          mediaViewport.innerHTML = `<div class="loading-pulse">>> ĐANG VẼ & LOẠI BỎ WATERMARK (${attempt}/3)... <<</div>`;
+          const currentSeed = Math.floor(Math.random() * 10000000);
+          const rawUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(finalPrompt)}?width=${width}&height=${height}&model=flux&seed=${currentSeed}&nologo=true`;
+
+          return new Promise((resolve, reject) => {
+            const rawImg = new Image();
+            rawImg.crossOrigin = "anonymous";
+            const timeout = setTimeout(() => { rawImg.src = ""; reject(new Error("Timeout")); }, 18000);
+
+            rawImg.onload = async () => {
+              clearTimeout(timeout);
+              if (rawImg.naturalHeight < 200) { reject(new Error("Ảnh lỗi")); return; }
+              try {
+                const cleanDataUrl = await removeWatermark(rawImg);
+                resolve(cleanDataUrl);
+              } catch (err) {
+                resolve(rawUrl);
+              }
+            };
+            rawImg.onerror = () => { clearTimeout(timeout); reject(new Error("Lỗi mạng")); };
+            rawImg.src = rawUrl;
+          });
+        }
+
+        for (let i = 1; i <= 3; i++) {
+          try {
+            const cleanUrl = await tryLoadImage(i);
+            const img = document.createElement("img");
+            img.className = "generated-img";
+            img.src = cleanUrl;
+            mediaViewport.innerHTML = "";
+            mediaViewport.appendChild(img);
+
+            const actions = document.createElement("div");
+            actions.className = "card-actions";
+            actions.innerHTML = `
+              <button class="action-btn" onclick="openFullscreen('${cleanUrl}')">TOÀN CẢNH ⤢</button>
+              <button class="action-btn" onclick="downloadCleanFile('${cleanUrl}', 'liber_art', '.jpg')">TẢI VỀ</button>
+            `;
+            card.appendChild(actions);
+
+            saveMediaToFirebase(rawPrompt, cleanUrl, 'image');
+            registerImageCreated();
+            break;
+          } catch (e) {
+            if (i === 3) mediaViewport.innerHTML = `<div style="color:#ff3333; padding:20px;">⚠️ LỖI: Không thể tải ảnh. Hãy thử lại.</div>`;
+          }
+        }
+      } else {
+        finalPrompt = `${finalPrompt}, cinematic movie motion, 8k`;
+        const videoUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(finalPrompt)}?width=768&height=1024&model=video&seed=${seed}&nologo=true`;
+
+        const video = document.createElement("video");
+        video.className = "generated-video";
+        video.autoplay = true;
+        video.loop = true;
+        video.controls = true;
+        video.muted = true;
+        video.playsInline = true;
+
+        video.oncanplaythrough = () => {
+          mediaViewport.innerHTML = "";
+          mediaViewport.appendChild(video);
+          const actions = document.createElement("div");
+          actions.className = "card-actions";
+          actions.innerHTML = `
+            <a class="action-btn" href="${videoUrl}" target="_blank">MỞ TAB MỚI ⤢</a>
+            <button class="action-btn" onclick="downloadCleanFile('${videoUrl}', 'liber_motion', '.mp4')">TẢI VIDEO</button>
+          `;
+          card.appendChild(actions);
+          saveMediaToFirebase(rawPrompt, videoUrl, 'video');
+        };
+
+        video.onerror = () => {
+          mediaViewport.innerHTML = `<div style="color:#ff3333; padding:20px;">⚠️ LỖI: Máy chủ dựng phim đang bận.</div>`;
+        };
+
+        video.src = videoUrl;
+      }
+
+      if (!COOLDOWN_LAYER || COOLDOWN_LAYER.style.display !== "flex") {
+        execBtn.disabled = false;
+        mainInput.focus();
+      }
+      mainInput.value = "";
+    }
+
+    function openFullscreen(dataUrl) {
+      const win = window.open("");
+      win.document.write(`<body style="margin:0;background:#050000;display:flex;justify-content:center;align-items:center;min-height:100vh;"><img src="${dataUrl}" style="max-width:100%;max-height:100vh;object-fit:contain;"></body>`);
+    }
+
+    function downloadCleanFile(url, prefix, ext) {
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${prefix}_${Date.now()}${ext}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
+
+    function handleExecute() {
+      if (COOLDOWN_LAYER && COOLDOWN_LAYER.style.display === "flex") return;
+
+      const text = mainInput.value.trim();
+      if (!text) return;
+
+      const normalizedCmd = text
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/đ/gi, "d")
+        .replace(/[\s:_\-]/g, "")
+        .toLowerCase();
+      const hidden = /^hanmuc(\d+)(?:luot)?$/.exec(normalizedCmd);
+      if (hidden) {
+        const amount = parseInt(hidden[1], 10);
+        applyHiddenQuota(amount);
+        mainInput.value = "";
+        const notice = "HẠN MỨC ẨN ĐÃ KÍCH HOẠT: " + amount + " LẦN TẠO ẢNH.";
+        if (activeTab === 'synth') showSynthNotice(notice);
+        else appendMessage("ai", notice);
+        return;
+      }
+
+      if (activeTab === 'chat' || activeTab === 'history') {
+        mainInput.value = "";
+        handleChatExecution(text);
+      } else if (activeTab === 'synth') {
+        handleSynthExecution(text);
+      }
+    }
+
+    mainInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") handleExecute();
+    });
+  </script>
+
+  <!-- ACCESS GATE LOGIC -->
+  <script>
+    (function () {
+      const gate = document.getElementById('authGate');
+      const box = document.getElementById('authBox');
+      const userEl = document.getElementById('authUser');
+      const passEl = document.getElementById('authPass');
+      const errEl = document.getElementById('authError');
+      const btn = document.getElementById('authBtn');
+      const appLayout = document.querySelector('.app-layout');
+
+      function unlock() {
+        gate.style.display = 'none';
+        appLayout.style.display = 'flex';
+      }
+
+      function lock() {
+        appLayout.style.display = 'none';
+        gate.style.display = 'flex';
+        passEl.value = '';
+        errEl.textContent = '';
+        userEl.focus();
+      }
+
+      const errors = {
+        'auth/invalid-credential': 'Sai tên đăng nhập hoặc mật khẩu.',
+        'auth/wrong-password': 'Sai tên đăng nhập hoặc mật khẩu.',
+        'auth/user-not-found': 'Sai tên đăng nhập hoặc mật khẩu.',
+        'auth/invalid-email': 'Tên đăng nhập không hợp lệ.',
+        'auth/too-many-requests': 'Quá nhiều lần thử. Vui lòng chờ rồi thử lại.',
+        'auth/network-request-failed': 'Không có kết nối mạng.',
+        'auth/operation-not-allowed': 'Chưa bật đăng nhập Email/Password trong Firebase.',
+        'auth/user-disabled': 'Tài khoản đã bị vô hiệu hóa.'
+      };
+
+      function attempt() {
+        const api = window.liberAuth;
+        if (!api) {
+          errEl.textContent = '⚠ Chưa kết nối được Firebase Auth.';
+          return;
+        }
+        const id = userEl.value.trim();
+        if (!id) {
+          errEl.textContent = '⚠ Nhập tên đăng nhập.';
+          userEl.focus();
+          return;
+        }
+        const email = id.includes('@') ? id.toLowerCase() : id.toLowerCase() + '@liber.local';
+
+        btn.disabled = true;
+        btn.textContent = 'VERIFYING...';
+        errEl.textContent = '';
+
+        api.signIn(email, passEl.value).catch((e) => {
+          errEl.textContent = '⚠ ' + (errors[e.code] || 'Đăng nhập thất bại (' + (e.code || 'lỗi') + ').');
+          box.classList.remove('shake');
+          void box.offsetWidth;
+          box.classList.add('shake');
+          passEl.value = '';
+          passEl.focus();
+        }).finally(() => {
+          btn.disabled = false;
+          btn.textContent = 'ACCESS SYSTEM';
+        });
+      }
+
+      btn.addEventListener('click', attempt);
+      [userEl, passEl].forEach(el => el.addEventListener('keydown', e => {
+        if (e.key === 'Enter') attempt();
+      }));
+
+      window.addEventListener('liber-auth-state', (e) => {
+        e.detail.signedIn ? unlock() : lock();
+      });
+
+      setTimeout(() => {
+        if (!window.liberAuth) {
+          errEl.textContent = '⚠ Không tải được Firebase Auth. Kiểm tra mạng rồi tải lại trang.';
+        }
+      }, 10000);
+    })();
+  </script>
+</body>
+</html>
