@@ -815,16 +815,6 @@
       signOut: () => signOut(auth)
     };
 
-    window.liberGetToken = async () => {
-      const user = auth.currentUser;
-      if (!user) return "";
-      try {
-        return await user.getIdToken();
-      } catch (e) {
-        return "";
-      }
-    };
-
     window.handleLogout = () => signOut(auth);
 
     onAuthStateChanged(auth, (user) => {
@@ -1128,25 +1118,66 @@
 
     window.liberLimits = { configured: false, imageLimit: null, chatLimit: null };
 
-    /* Hạn mức thật được giữ trên server (Firebase rules khóa ghi) */
-    const QUOTA_GATEWAY = isFileProtocol ? "http://localhost:3000/api" : "/api";
+    /* Hạn mức dùng chung lưu trong tin nhắn ghim của bot Telegram */
+    const QUOTA_MARK = "LIBER_QUOTA_STATE:";
     let myServerQuota = null;
     let quotaPollTimer = null;
 
-    async function quotaRequest(pathname, method, body) {
-      const token = window.liberGetToken ? await window.liberGetToken() : "";
-      if (!token) throw new Error("chưa đăng nhập");
-      const response = await fetch(QUOTA_GATEWAY + pathname, {
-        method: method || "GET",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": "Bearer " + token
-        },
-        body: body ? JSON.stringify(body) : undefined
+    function emptyQuotaState() {
+      return { accounts: {}, limits: {} };
+    }
+
+    async function tgApi(method, payload) {
+      const response = await fetch(TG_API + "/" + method, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
       });
       const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.error || ("HTTP " + response.status));
-      return data;
+      if (!data.ok) throw new Error(data.description || method);
+      return data.result;
+    }
+
+    async function readQuotaStore() {
+      const chat = await tgApi("getChat", { chat_id: TG_CHAT_ID });
+      const pinned = chat && chat.pinned_message;
+      if (!pinned || typeof pinned.text !== "string" || pinned.text.indexOf(QUOTA_MARK) !== 0) {
+        return emptyQuotaState();
+      }
+      try {
+        const parsed = JSON.parse(pinned.text.slice(QUOTA_MARK.length));
+        return {
+          accounts: parsed.accounts && typeof parsed.accounts === "object" ? parsed.accounts : {},
+          limits: parsed.limits && typeof parsed.limits === "object" ? parsed.limits : {}
+        };
+      } catch (e) {
+        return emptyQuotaState();
+      }
+    }
+
+    async function writeQuotaStore(state) {
+      const text = QUOTA_MARK + JSON.stringify(state);
+      const chat = await tgApi("getChat", { chat_id: TG_CHAT_ID });
+      const pinned = chat && chat.pinned_message;
+      const hasState = pinned && typeof pinned.text === "string" && pinned.text.indexOf(QUOTA_MARK) === 0;
+      if (hasState) {
+        await tgApi("editMessageText", {
+          chat_id: TG_CHAT_ID,
+          message_id: pinned.message_id,
+          text
+        });
+        return;
+      }
+      const sent = await tgApi("sendMessage", {
+        chat_id: TG_CHAT_ID,
+        text,
+        disable_notification: true
+      });
+      await tgApi("pinChatMessage", {
+        chat_id: TG_CHAT_ID,
+        message_id: sent.message_id,
+        disable_notification: true
+      });
     }
 
     function setMyServerQuota(record) {
@@ -1154,28 +1185,29 @@
       applyLimitSources();
     }
 
-    function applyAdminServerData(data) {
-      if (!data || !data.admin) return;
-      const limitTree = {};
-      Object.entries(data.limits || {}).forEach(([key, rec]) => {
-        if (rec && typeof rec === "object") limitTree[key] = rec;
-      });
-      const accountTree = {};
-      (data.accounts || []).forEach((acc) => {
-        if (acc && acc.email) accountTree[accountKey(acc.email)] = acc;
-      });
-      adminLimitSources.server = limitTree;
-      adminAccountSources.server = accountTree;
-      mergeAdminLimitTrees();
-      mergeAdminAccountTrees();
+    function applyQuotaStore(state) {
+      const email = (window.currentUserEmail || "").toLowerCase();
+      setMyServerQuota((state.limits || {})[accountKey(email)] || null);
+      if (isAdmin()) {
+        adminLimitSources.telegram = state.limits || {};
+        adminAccountSources.telegram = state.accounts || {};
+        mergeAdminLimitTrees();
+        mergeAdminAccountTrees();
+      }
     }
 
     async function refreshQuotaFromServer() {
       if (!window.currentUserEmail) return;
       try {
-        const data = await quotaRequest("/quota");
-        if (data.admin) applyAdminServerData(data);
-        else setMyServerQuota(data.limits);
+        applyQuotaStore(await readQuotaStore());
+      } catch (e) {}
+    }
+
+    async function registerQuotaAccount(email) {
+      try {
+        const state = await readQuotaStore();
+        state.accounts[accountKey(email)] = { email: email, lastSeen: Date.now() };
+        await writeQuotaStore(state);
       } catch (e) {}
     }
 
@@ -1442,38 +1474,26 @@
         const n = parseInt(raw, 10);
         return Number.isFinite(n) && n >= 0 ? n : null;
       };
-      const payload = {
+      const record = {
         imageLimit: parseLimit("adminImageLimit"),
         chatLimit: parseLimit("adminChatLimit"),
         updatedAt: Date.now(),
         updatedBy: (window.currentUserEmail || "").toLowerCase()
       };
       status.textContent = "Đang lưu...";
-      quotaRequest("/quota", "POST", {
-        email: targetEmail,
-        imageLimit: payload.imageLimit,
-        chatLimit: payload.chatLimit
-      })
-        .then((data) => {
-          const record = (data && data.limits) || payload;
-          adminLimitSources.server = Object.assign({}, adminLimitSources.server || {}, {
-            [adminTargetKey]: record
-          });
-          mergeAdminLimitTrees();
-          if ((window.currentUserEmail || "").toLowerCase() === targetEmail) {
-            setMyServerQuota(record);
-          }
-          if (window.db && window.dbSet) {
-            writeWithFallback(LIMIT_SOURCES, adminTargetKey, record).catch(() => {});
-          }
+      readQuotaStore()
+        .then((state) => {
+          state.limits[adminTargetKey] = record;
+          state.accounts[adminTargetKey] = { email: targetEmail, lastSeen: Date.now() };
+          return writeQuotaStore(state).then(() => state);
+        })
+        .then((state) => {
+          applyQuotaStore(state);
           status.textContent = "✓ Đã lưu. Tài khoản kia nhận ngay.";
           setTimeout(() => { if (status.textContent.indexOf("✓") === 0) status.textContent = ""; }, 3000);
         })
         .catch((e) => {
-          const message = e && e.message ? e.message : "không rõ";
-          status.textContent = message.indexOf("404") >= 0
-            ? "⚠ Server chưa có API hạn mức (404). Bản deploy chưa cập nhật."
-            : "⚠ Lỗi lưu: " + message;
+          status.textContent = "⚠ Lỗi lưu: " + (e && e.message ? e.message : "không rõ");
         });
     };
 
@@ -1628,6 +1648,7 @@
         const email = (window.currentUserEmail || "").toLowerCase();
         subscribeLimits(email);
         registerAccount(email);
+        registerQuotaAccount(email);
         startQuotaPolling();
         refreshQuotaInfo();
         refreshChatQuotaInfo();
