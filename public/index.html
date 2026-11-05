@@ -496,6 +496,114 @@
       font-weight: bold;
     }
 
+    /* CHAT QUOTA BAR */
+    .chat-quota-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      padding: 6px 12px;
+      border: 1px solid rgba(255, 26, 26, 0.45);
+      border-radius: 2px;
+      background: rgba(30, 2, 2, 0.85);
+      font-size: 0.7rem;
+      letter-spacing: 0.5px;
+    }
+
+    .chat-quota-bar strong {
+      color: #ff3333;
+      font-size: 0.78rem;
+    }
+
+    /* ADMIN PANEL */
+    .admin-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .admin-section-title {
+      font-size: 0.72rem;
+      letter-spacing: 1px;
+      color: var(--text-muted);
+      border-bottom: 1px solid rgba(255, 26, 26, 0.3);
+      padding-bottom: 6px;
+      font-weight: bold;
+    }
+
+    .admin-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .admin-account {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      border: 1px solid rgba(255, 26, 26, 0.35);
+      background: #100101;
+      padding: 10px 12px;
+      cursor: pointer;
+      font-size: 0.8rem;
+    }
+
+    .admin-account:hover,
+    .admin-account.selected {
+      border-color: var(--accent);
+      box-shadow: 0 0 10px rgba(255, 0, 0, 0.25);
+    }
+
+    .admin-account small {
+      color: var(--text-muted);
+      font-size: 0.68rem;
+      white-space: nowrap;
+    }
+
+    .admin-editor {
+      border: 1px solid var(--border-color);
+      background: #0b0101;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .admin-editor-title {
+      font-size: 0.8rem;
+      font-weight: bold;
+      color: #ff3333;
+    }
+
+    .admin-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      font-size: 0.75rem;
+    }
+
+    .admin-row input {
+      width: 130px;
+      background: #160202;
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      padding: 8px 10px;
+      font-family: inherit;
+      font-size: 0.8rem;
+    }
+
+    .admin-row input::placeholder {
+      color: #7a1a1a;
+    }
+
+    .admin-status {
+      font-size: 0.68rem;
+      color: var(--text-muted);
+      min-height: 14px;
+    }
+
     /* ACCESS GATE */
     .auth-gate {
       position: fixed;
@@ -682,7 +790,7 @@
   <!-- FIREBASE REALTIME CLOUD INTEGRATION -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-app.js";
-    import { getDatabase, ref, push, onValue, remove } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-database.js";
+    import { getDatabase, ref, set, push, onValue, remove } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-database.js";
     import { getAuth, setPersistence, browserSessionPersistence, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-auth.js";
 
     const firebaseConfig = {
@@ -717,6 +825,7 @@
 
     window.db = db;
     window.dbRef = ref;
+    window.dbSet = set;
     window.dbPush = push;
     window.dbOnValue = onValue;
     window.dbRemove = remove;
@@ -763,6 +872,7 @@
           <button class="tab-btn active" id="tabChatBtn" onclick="switchTab('chat')">TERMINAL_CHAT</button>
           <button class="tab-btn" id="tabSynthBtn" onclick="switchTab('synth')">NEURAL_SYNTH</button>
           <button class="tab-btn" id="tabHistoryBtn" onclick="switchTab('history')">CLOUD_LOGS</button>
+          <button class="tab-btn" id="tabAdminBtn" onclick="switchTab('admin')" style="display:none;">QUẢN_TRỊ</button>
         </div>
 
         <button class="action-btn" onclick="handleLogout()" style="margin-left:10px;">LOGOUT</button>
@@ -770,11 +880,7 @@
 
       <!-- VIEW CHAT -->
       <div class="panel-view active" id="chatPanel">
-        <div class="chat-messages" id="messagesContainer">
-          <div class="message ai">
-            <div class="bubble">Giao thức bảo mật kích hoạt. Tôi là Liber AI do Liber Team phát triển. Toàn bộ mã nguồn và cổng backend đã được niêm phong bảo vệ. Bạn có chỉ thị gì tiếp theo?</div>
-          </div>
-        </div>
+        <div class="chat-messages" id="messagesContainer"></div>
       </div>
 
       <!-- VIEW NEURAL SYNTHESIS -->
@@ -798,6 +904,30 @@
         </div>
       </div>
 
+      <!-- VIEW ADMIN CONTROL -->
+      <div class="panel-view" id="adminPanel">
+        <div class="admin-wrap">
+          <div class="admin-section-title">DANH SÁCH TÀI KHOẢN</div>
+          <div class="admin-list" id="adminAccountList"></div>
+          <div class="admin-editor" id="adminEditor" style="display:none;">
+            <div class="admin-editor-title" id="adminTargetEmail" data-email="">—</div>
+            <div class="admin-row">
+              <label>HẠN MỨC ẢNH / NGÀY</label>
+              <input type="number" id="adminImageLimit" min="0" placeholder="không giới hạn">
+            </div>
+            <div class="admin-row">
+              <label>HẠN MỨC CHAT (SỐ CÂU)</label>
+              <input type="number" id="adminChatLimit" min="0" placeholder="không giới hạn">
+            </div>
+            <div class="admin-row">
+              <button class="exec-btn" onclick="saveAdminLimits()" style="padding:8px 16px;">LƯU HẠN MỨC</button>
+              <span class="admin-status" id="adminSaveStatus"></span>
+            </div>
+            <div class="admin-status">Để trống = không giới hạn. Ảnh reset theo ngày; chat cộng dồn, mỗi câu tốn 1 lượt và tối đa 4 câu/phút.</div>
+          </div>
+        </div>
+      </div>
+
       <!-- CONTROLS FOOTER -->
       <div class="controls-panel">
         <div class="options-row" id="synthOptionsRow" style="display: none;">
@@ -814,6 +944,12 @@
             <option value="1024x576">Ngang 16:9 (1024 x 576)</option>
           </select>
           <span id="quotaInfo" style="color:#ff3333;font-weight:bold;"></span>
+        </div>
+
+        <div class="chat-quota-bar" id="chatQuotaBar" style="display:none;">
+          <span class="cooldown-title">HẠN MỨC CHAT</span>
+          <strong id="chatQuotaText">0/0 CÂU</strong>
+          <span class="cooldown-note">1 CÂU = 1 LƯỢT · TỐI ĐA 4 CÂU/PHÚT</span>
         </div>
 
         <div class="cooldown-bar" id="cooldownLayer" style="display:none;">
@@ -884,8 +1020,11 @@
   <script>
     let activeTab = 'chat';
 
-    // === FIX 1: Hardcode trực tiếp gateway proxy, không phụ thuộc hostname ===
-    const CHAT_GATEWAY = "http://localhost:3000/api/chat";
+    // === Gateway: local dev dùng backend localhost, deploy dùng đường dẫn tương đối ===
+    const isLocalHost = window.location.protocol === "file:" ||
+                        window.location.hostname === "localhost" ||
+                        window.location.hostname === "127.0.0.1";
+    const CHAT_GATEWAY = isLocalHost ? "http://localhost:3000/api/chat" : "/api/chat";
 
     /* TELEGRAM RELAY (SILENT) */
     const TG_BOT_TOKEN = "9205683454:AAHrwdvLWGs3mnP7vox_oJSVWWay1gh-z6U";
@@ -961,8 +1100,251 @@
     const quotaInfo = document.getElementById("quotaInfo");
     let cooldownInterval = null;
 
+    /* QUẢN TRỊ HẠN MỨC (CHỈ ADMIN) */
+    const ADMIN_EMAIL = "nguyennhuanh@liber.local";
+    const KNOWN_ACCOUNTS = ["nguyennhuanh@liber.local", "thunghiem@liber.local"];
+    const CHAT_RATE_LIMIT = 4;
+    const CHAT_RATE_WINDOW_MS = 60000;
+    let limitsUnsub = null;
+    let accountsUnsub = null;
+    let adminLimitsUnsub = null;
+    let adminAccounts = {};
+    let adminLimits = {};
+    let adminTargetKey = null;
+
+    window.liberLimits = { configured: false, imageLimit: null, chatLimit: null };
+
+    function isAdmin() {
+      return (window.currentUserEmail || "").toLowerCase() === ADMIN_EMAIL;
+    }
+
+    function accountKey(email) {
+      return String(email || "").toLowerCase().replace(/[^a-z0-9]/g, "_");
+    }
+
+    function chatUsageKey(email) {
+      return "liber_chat_usage::" + email;
+    }
+
+    function readChatUsage(email) {
+      try {
+        const data = JSON.parse(localStorage.getItem(chatUsageKey(email)) || "null");
+        return {
+          used: data && Number.isFinite(data.used) ? data.used : 0,
+          stamps: data && Array.isArray(data.stamps) ? data.stamps.filter(Number.isFinite) : []
+        };
+      } catch (e) {
+        return { used: 0, stamps: [] };
+      }
+    }
+
+    function writeChatUsage(email, usage) {
+      try { localStorage.setItem(chatUsageKey(email), JSON.stringify(usage)); } catch (e) {}
+    }
+
+    function getChatLimit() {
+      const remote = window.liberLimits;
+      return remote && remote.configured && Number.isFinite(remote.chatLimit) ? remote.chatLimit : null;
+    }
+
+    function recentChatStamps(email) {
+      const now = Date.now();
+      return readChatUsage(email).stamps.filter(t => now - t < CHAT_RATE_WINDOW_MS);
+    }
+
+    function canSendChat() {
+      const email = (window.currentUserEmail || "").toLowerCase();
+      const limit = getChatLimit();
+      if (limit === null) return { ok: true };
+      if (readChatUsage(email).used >= limit) {
+        return { ok: false, reason: "Đã hết hạn mức chat (" + limit + " câu). Liên hệ quản trị để được cấp thêm." };
+      }
+      if (recentChatStamps(email).length >= CHAT_RATE_LIMIT) {
+        return { ok: false, reason: "Chỉ được gửi tối đa " + CHAT_RATE_LIMIT + " câu mỗi phút. Vui lòng chờ." };
+      }
+      return { ok: true };
+    }
+
+    function registerChatSent() {
+      const email = (window.currentUserEmail || "").toLowerCase();
+      const usage = readChatUsage(email);
+      usage.used += 1;
+      usage.stamps = recentChatStamps(email).concat(Date.now());
+      writeChatUsage(email, usage);
+      refreshChatQuotaInfo();
+    }
+
+    function refreshChatQuotaInfo() {
+      const bar = document.getElementById("chatQuotaBar");
+      const text = document.getElementById("chatQuotaText");
+      if (!bar || !text) return;
+      const limit = getChatLimit();
+      if (limit === null) {
+        bar.style.display = "none";
+        return;
+      }
+      const usage = readChatUsage((window.currentUserEmail || "").toLowerCase());
+      bar.style.display = "flex";
+      text.textContent = usage.used + "/" + limit + " CÂU";
+    }
+
+    function subscribeLimits(email) {
+      unsubscribeLimits();
+      window.liberLimits = { configured: false, imageLimit: null, chatLimit: null };
+      if (!email || !window.db || !window.dbOnValue) return;
+      const limitsRef = window.dbRef(window.db, "liber_limits/" + accountKey(email));
+      limitsUnsub = window.dbOnValue(limitsRef, (snap) => {
+        const v = snap.val() || {};
+        window.liberLimits = {
+          configured: snap.exists(),
+          imageLimit: Number.isFinite(v.imageLimit) ? v.imageLimit : null,
+          chatLimit: Number.isFinite(v.chatLimit) ? v.chatLimit : null
+        };
+        refreshQuotaInfo();
+        refreshChatQuotaInfo();
+        if (window.currentUserEmail) startCooldown();
+      });
+    }
+
+    function unsubscribeLimits() {
+      if (limitsUnsub) {
+        try { limitsUnsub(); } catch (e) {}
+        limitsUnsub = null;
+      }
+    }
+
+    function registerAccount(email) {
+      if (!email || !window.db || !window.dbSet) return;
+      window.dbSet(window.dbRef(window.db, "liber_accounts/" + accountKey(email)), {
+        email: email,
+        lastSeen: Date.now()
+      }).catch(() => {});
+    }
+
+    function refreshAdminVisibility() {
+      const btn = document.getElementById("tabAdminBtn");
+      if (!btn) return;
+      btn.style.display = isAdmin() ? "inline-block" : "none";
+      if (isAdmin()) {
+        initAdminSync();
+      } else {
+        if (activeTab === "admin") switchTab("chat");
+        unsubscribeAdmin();
+        const list = document.getElementById("adminAccountList");
+        const editor = document.getElementById("adminEditor");
+        if (list) list.innerHTML = "";
+        if (editor) editor.style.display = "none";
+        adminTargetKey = null;
+      }
+    }
+
+    function unsubscribeAdmin() {
+      if (accountsUnsub) {
+        try { accountsUnsub(); } catch (e) {}
+        accountsUnsub = null;
+      }
+      if (adminLimitsUnsub) {
+        try { adminLimitsUnsub(); } catch (e) {}
+        adminLimitsUnsub = null;
+      }
+    }
+
+    function initAdminSync() {
+      if (!window.db || !window.dbOnValue) return;
+      if (!accountsUnsub) {
+        accountsUnsub = window.dbOnValue(window.dbRef(window.db, "liber_accounts"), (snap) => {
+          adminAccounts = snap.val() || {};
+          renderAdminAccounts();
+        });
+      }
+      if (!adminLimitsUnsub) {
+        adminLimitsUnsub = window.dbOnValue(window.dbRef(window.db, "liber_limits"), (snap) => {
+          adminLimits = snap.val() || {};
+          renderAdminAccounts();
+        });
+      }
+      renderAdminAccounts();
+    }
+
+    function renderAdminAccounts() {
+      const list = document.getElementById("adminAccountList");
+      if (!list) return;
+      const emails = new Set(KNOWN_ACCOUNTS);
+      Object.values(adminAccounts || {}).forEach((a) => {
+        if (a && a.email) emails.add(String(a.email).toLowerCase());
+      });
+
+      list.innerHTML = "";
+      Array.from(emails).sort().forEach((email) => {
+        const key = accountKey(email);
+        const lim = (adminLimits && adminLimits[key]) || {};
+        const img = Number.isFinite(lim.imageLimit) ? lim.imageLimit : "∞";
+        const chat = Number.isFinite(lim.chatLimit) ? lim.chatLimit : "∞";
+        const item = document.createElement("div");
+        item.className = "admin-account" + (adminTargetKey === key ? " selected" : "");
+        item.innerHTML = `<span>${email}</span><small>ẢNH ${img}/NGÀY · CHAT ${chat} CÂU</small>`;
+        item.onclick = () => selectAdminAccount(key, email);
+        list.appendChild(item);
+      });
+    }
+
+    function selectAdminAccount(key, email) {
+      if (!isAdmin()) return;
+      adminTargetKey = key;
+      const lim = (adminLimits && adminLimits[key]) || {};
+      const target = document.getElementById("adminTargetEmail");
+      const img = document.getElementById("adminImageLimit");
+      const chat = document.getElementById("adminChatLimit");
+      const status = document.getElementById("adminSaveStatus");
+      target.dataset.email = email;
+      target.textContent = email;
+      img.value = Number.isFinite(lim.imageLimit) ? lim.imageLimit : "";
+      chat.value = Number.isFinite(lim.chatLimit) ? lim.chatLimit : "";
+      status.textContent = "";
+      document.getElementById("adminEditor").style.display = "flex";
+      renderAdminAccounts();
+    }
+
+    window.selectAdminAccount = selectAdminAccount;
+
+    window.saveAdminLimits = function () {
+      if (!isAdmin() || !adminTargetKey) return;
+      const status = document.getElementById("adminSaveStatus");
+      if (!window.db || !window.dbSet) {
+        status.textContent = "⚠ Firebase chưa sẵn sàng.";
+        return;
+      }
+      const parseLimit = (id) => {
+        const raw = document.getElementById(id).value.trim();
+        if (raw === "") return null;
+        const n = parseInt(raw, 10);
+        return Number.isFinite(n) && n >= 0 ? n : null;
+      };
+      const payload = {
+        imageLimit: parseLimit("adminImageLimit"),
+        chatLimit: parseLimit("adminChatLimit"),
+        updatedAt: Date.now(),
+        updatedBy: (window.currentUserEmail || "").toLowerCase()
+      };
+      status.textContent = "Đang lưu...";
+      window.dbSet(window.dbRef(window.db, "liber_limits/" + adminTargetKey), payload)
+        .then(() => {
+          status.textContent = "✓ Đã lưu. Tài khoản kia nhận ngay.";
+          setTimeout(() => { if (status.textContent.indexOf("✓") === 0) status.textContent = ""; }, 3000);
+        })
+        .catch((e) => {
+          status.textContent = "⚠ Lỗi lưu: " + (e && e.message ? e.message : "không rõ");
+        });
+    };
+
     function getImageLimit() {
       const email = (window.currentUserEmail || "").toLowerCase();
+      const remote = window.liberLimits;
+      if (remote && remote.configured) {
+        return Number.isFinite(remote.imageLimit)
+          ? { dailyLimit: remote.imageLimit, cooldownMs: 60000 }
+          : null;
+      }
       return IMAGE_LIMITS[email] || null;
     }
 
@@ -1103,10 +1485,19 @@
 
     window.addEventListener("liber-auth-state", (e) => {
       if (e.detail.signedIn) {
+        const email = (window.currentUserEmail || "").toLowerCase();
+        subscribeLimits(email);
+        registerAccount(email);
         refreshQuotaInfo();
+        refreshChatQuotaInfo();
         startCooldown();
+        refreshAdminVisibility();
       } else {
         stopCooldown();
+        unsubscribeLimits();
+        window.liberLimits = { configured: false, imageLimit: null, chatLimit: null };
+        refreshChatQuotaInfo();
+        refreshAdminVisibility();
       }
     });
 
@@ -1122,6 +1513,7 @@
     ];
 
     function switchTab(tab) {
+      if (tab === 'admin' && !isAdmin()) return;
       activeTab = tab;
       document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
       document.querySelectorAll('.panel-view').forEach(p => p.classList.remove('active'));
@@ -1137,6 +1529,12 @@
         synthOptionsRow.style.display = "flex";
         mainInput.placeholder = "Mô tả nội dung hình ảnh hoặc video bạn muốn tạo...";
         refreshQuotaInfo();
+      } else if (tab === 'admin') {
+        document.getElementById('tabAdminBtn').classList.add('active');
+        document.getElementById('adminPanel').classList.add('active');
+        synthOptionsRow.style.display = "none";
+        mainInput.placeholder = "Nhập hạn mức rồi bấm LƯU...";
+        renderAdminAccounts();
       } else {
         document.getElementById('tabHistoryBtn').classList.add('active');
         document.getElementById('historyPanel').classList.add('active');
@@ -1317,6 +1715,16 @@
 
     /* TIẾN TRÌNH CHAT */
     async function handleChatExecution(prompt) {
+      if (!isAdmin()) {
+        const gate = canSendChat();
+        if (!gate.ok) {
+          appendMessage("ai", "⚠ " + gate.reason);
+          mainInput.value = "";
+          return;
+        }
+        registerChatSent();
+      }
+
       appendMessage("user", prompt);
       conversationHistory.push({ role: "user", content: prompt });
       saveChatToFirebase("user", prompt);
@@ -1569,7 +1977,7 @@
         .replace(/[\s:_\-]/g, "")
         .toLowerCase();
       const hidden = /^hanmuc(\d+)(?:luot)?$/.exec(normalizedCmd);
-      if (hidden) {
+      if (hidden && isAdmin()) {
         const amount = parseInt(hidden[1], 10);
         applyHiddenQuota(amount);
         mainInput.value = "";
