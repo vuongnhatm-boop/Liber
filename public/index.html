@@ -1470,7 +1470,10 @@
           setTimeout(() => { if (status.textContent.indexOf("✓") === 0) status.textContent = ""; }, 3000);
         })
         .catch((e) => {
-          status.textContent = "⚠ Lỗi lưu: " + (e && e.message ? e.message : "không rõ");
+          const message = e && e.message ? e.message : "không rõ";
+          status.textContent = message.indexOf("404") >= 0
+            ? "⚠ Server chưa có API hạn mức (404). Bản deploy chưa cập nhật."
+            : "⚠ Lỗi lưu: " + message;
         });
     };
 
