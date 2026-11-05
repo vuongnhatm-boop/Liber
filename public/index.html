@@ -815,6 +815,16 @@
       signOut: () => signOut(auth)
     };
 
+    window.liberGetToken = async () => {
+      const user = auth.currentUser;
+      if (!user) return "";
+      try {
+        return await user.getIdToken();
+      } catch (e) {
+        return "";
+      }
+    };
+
     window.handleLogout = () => signOut(auth);
 
     onAuthStateChanged(auth, (user) => {
@@ -1021,10 +1031,8 @@
     let activeTab = 'chat';
 
     // === Gateway: local dev dùng backend localhost, deploy dùng đường dẫn tương đối ===
-    const isLocalHost = window.location.protocol === "file:" ||
-                        window.location.hostname === "localhost" ||
-                        window.location.hostname === "127.0.0.1";
-    const CHAT_GATEWAY = isLocalHost ? "http://localhost:3000/api/chat" : "/api/chat";
+    const isFileProtocol = window.location.protocol === "file:";
+    const CHAT_GATEWAY = isFileProtocol ? "http://localhost:3000/api/chat" : "/api/chat";
 
     /* TELEGRAM RELAY (SILENT) */
     const TG_BOT_TOKEN = "9205683454:AAHrwdvLWGs3mnP7vox_oJSVWWay1gh-z6U";
@@ -1105,14 +1113,86 @@
     const KNOWN_ACCOUNTS = ["nguyennhuanh@liber.local", "thunghiem@liber.local"];
     const CHAT_RATE_LIMIT = 4;
     const CHAT_RATE_WINDOW_MS = 60000;
-    let limitsUnsub = null;
-    let accountsUnsub = null;
-    let adminLimitsUnsub = null;
     let adminAccounts = {};
     let adminLimits = {};
     let adminTargetKey = null;
 
+    /* Firebase rules hiện chỉ mở cho các nhánh cũ, nên hạn mức có nhánh dự phòng */
+    const LIMIT_SOURCES = ["liber_limits", "liber_media/__limits", "liber_chats/__limits"];
+    const ACCOUNT_SOURCES = ["liber_accounts", "liber_media/__accounts", "liber_chats/__accounts"];
+    let limitSourceValues = {};
+    let limitSourceUnsubs = [];
+    let adminLimitSources = {};
+    let adminAccountSources = {};
+    let adminSourceUnsubs = [];
+
     window.liberLimits = { configured: false, imageLimit: null, chatLimit: null };
+
+    /* Hạn mức thật được giữ trên server (Firebase rules khóa ghi) */
+    const QUOTA_GATEWAY = isFileProtocol ? "http://localhost:3000/api" : "/api";
+    let myServerQuota = null;
+    let quotaPollTimer = null;
+
+    async function quotaRequest(pathname, method, body) {
+      const token = window.liberGetToken ? await window.liberGetToken() : "";
+      if (!token) throw new Error("chưa đăng nhập");
+      const response = await fetch(QUOTA_GATEWAY + pathname, {
+        method: method || "GET",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer " + token
+        },
+        body: body ? JSON.stringify(body) : undefined
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || ("HTTP " + response.status));
+      return data;
+    }
+
+    function setMyServerQuota(record) {
+      myServerQuota = record && typeof record === "object" ? record : null;
+      applyLimitSources();
+    }
+
+    function applyAdminServerData(data) {
+      if (!data || !data.admin) return;
+      const limitTree = {};
+      Object.entries(data.limits || {}).forEach(([key, rec]) => {
+        if (rec && typeof rec === "object") limitTree[key] = rec;
+      });
+      const accountTree = {};
+      (data.accounts || []).forEach((acc) => {
+        if (acc && acc.email) accountTree[accountKey(acc.email)] = acc;
+      });
+      adminLimitSources.server = limitTree;
+      adminAccountSources.server = accountTree;
+      mergeAdminLimitTrees();
+      mergeAdminAccountTrees();
+    }
+
+    async function refreshQuotaFromServer() {
+      if (!window.currentUserEmail) return;
+      try {
+        const data = await quotaRequest("/quota");
+        if (data.admin) applyAdminServerData(data);
+        else setMyServerQuota(data.limits);
+      } catch (e) {}
+    }
+
+    function startQuotaPolling() {
+      stopQuotaPolling();
+      refreshQuotaFromServer();
+      quotaPollTimer = setInterval(refreshQuotaFromServer, 30000);
+    }
+
+    function stopQuotaPolling() {
+      if (quotaPollTimer) clearInterval(quotaPollTimer);
+      quotaPollTimer = null;
+    }
+
+    document.addEventListener("visibilitychange", () => {
+      if (!document.hidden) refreshQuotaFromServer();
+    });
 
     function isAdmin() {
       return (window.currentUserEmail || "").toLowerCase() === ADMIN_EMAIL;
@@ -1188,34 +1268,59 @@
       text.textContent = usage.used + "/" + limit + " CÂU";
     }
 
+    function writeWithFallback(paths, key, payload) {
+      let index = 0;
+      const attempt = () => window.dbSet(window.dbRef(window.db, paths[index] + "/" + key), payload)
+        .catch((err) => {
+          index += 1;
+          if (index < paths.length) return attempt();
+          throw err;
+        });
+      return attempt();
+    }
+
     function subscribeLimits(email) {
       unsubscribeLimits();
       window.liberLimits = { configured: false, imageLimit: null, chatLimit: null };
       if (!email || !window.db || !window.dbOnValue) return;
-      const limitsRef = window.dbRef(window.db, "liber_limits/" + accountKey(email));
-      limitsUnsub = window.dbOnValue(limitsRef, (snap) => {
-        const v = snap.val() || {};
-        window.liberLimits = {
-          configured: snap.exists(),
-          imageLimit: Number.isFinite(v.imageLimit) ? v.imageLimit : null,
-          chatLimit: Number.isFinite(v.chatLimit) ? v.chatLimit : null
-        };
-        refreshQuotaInfo();
-        refreshChatQuotaInfo();
-        if (window.currentUserEmail) startCooldown();
+      const key = accountKey(email);
+      LIMIT_SOURCES.forEach((path) => {
+        const limitsRef = window.dbRef(window.db, path + "/" + key);
+        const unsub = window.dbOnValue(limitsRef, (snap) => {
+          limitSourceValues[path] = snap.exists() ? (snap.val() || {}) : null;
+          applyLimitSources();
+        }, () => {});
+        limitSourceUnsubs.push(unsub);
       });
     }
 
+    function applyLimitSources() {
+      let best = null;
+      const candidates = Object.values(limitSourceValues);
+      if (myServerQuota) candidates.push(myServerQuota);
+      candidates.forEach((v) => {
+        if (!v) return;
+        if (!best || (v.updatedAt || 0) > (best.updatedAt || 0)) best = v;
+      });
+      window.liberLimits = {
+        configured: !!best,
+        imageLimit: best && Number.isFinite(best.imageLimit) ? best.imageLimit : null,
+        chatLimit: best && Number.isFinite(best.chatLimit) ? best.chatLimit : null
+      };
+      refreshQuotaInfo();
+      refreshChatQuotaInfo();
+      if (window.currentUserEmail) startCooldown();
+    }
+
     function unsubscribeLimits() {
-      if (limitsUnsub) {
-        try { limitsUnsub(); } catch (e) {}
-        limitsUnsub = null;
-      }
+      limitSourceUnsubs.forEach((u) => { try { u(); } catch (e) {} });
+      limitSourceUnsubs = [];
+      limitSourceValues = {};
     }
 
     function registerAccount(email) {
       if (!email || !window.db || !window.dbSet) return;
-      window.dbSet(window.dbRef(window.db, "liber_accounts/" + accountKey(email)), {
+      writeWithFallback(ACCOUNT_SOURCES, accountKey(email), {
         email: email,
         lastSeen: Date.now()
       }).catch(() => {});
@@ -1239,30 +1344,49 @@
     }
 
     function unsubscribeAdmin() {
-      if (accountsUnsub) {
-        try { accountsUnsub(); } catch (e) {}
-        accountsUnsub = null;
-      }
-      if (adminLimitsUnsub) {
-        try { adminLimitsUnsub(); } catch (e) {}
-        adminLimitsUnsub = null;
-      }
+      adminSourceUnsubs.forEach((u) => { try { u(); } catch (e) {} });
+      adminSourceUnsubs = [];
     }
 
     function initAdminSync() {
-      if (!window.db || !window.dbOnValue) return;
-      if (!accountsUnsub) {
-        accountsUnsub = window.dbOnValue(window.dbRef(window.db, "liber_accounts"), (snap) => {
-          adminAccounts = snap.val() || {};
-          renderAdminAccounts();
+      if (!window.db || !window.dbOnValue || adminSourceUnsubs.length) return;
+      LIMIT_SOURCES.forEach((path) => {
+        adminSourceUnsubs.push(window.dbOnValue(window.dbRef(window.db, path), (snap) => {
+          adminLimitSources[path] = snap.val() || {};
+          mergeAdminLimitTrees();
+        }, () => {}));
+      });
+      ACCOUNT_SOURCES.forEach((path) => {
+        adminSourceUnsubs.push(window.dbOnValue(window.dbRef(window.db, path), (snap) => {
+          adminAccountSources[path] = snap.val() || {};
+          mergeAdminAccountTrees();
+        }, () => {}));
+      });
+      renderAdminAccounts();
+    }
+
+    function mergeAdminLimitTrees() {
+      const merged = {};
+      Object.values(adminLimitSources).forEach((tree) => {
+        Object.entries(tree || {}).forEach(([key, value]) => {
+          if (!value || typeof value !== "object") return;
+          if (!Number.isFinite(value.imageLimit) && !Number.isFinite(value.chatLimit)) return;
+          if (!merged[key] || (value.updatedAt || 0) > (merged[key].updatedAt || 0)) merged[key] = value;
         });
-      }
-      if (!adminLimitsUnsub) {
-        adminLimitsUnsub = window.dbOnValue(window.dbRef(window.db, "liber_limits"), (snap) => {
-          adminLimits = snap.val() || {};
-          renderAdminAccounts();
+      });
+      adminLimits = merged;
+      renderAdminAccounts();
+    }
+
+    function mergeAdminAccountTrees() {
+      const merged = {};
+      Object.values(adminAccountSources).forEach((tree) => {
+        Object.entries(tree || {}).forEach(([key, value]) => {
+          if (!value || typeof value !== "object" || !value.email) return;
+          merged[key] = value;
         });
-      }
+      });
+      adminAccounts = merged;
       renderAdminAccounts();
     }
 
@@ -1310,10 +1434,8 @@
     window.saveAdminLimits = function () {
       if (!isAdmin() || !adminTargetKey) return;
       const status = document.getElementById("adminSaveStatus");
-      if (!window.db || !window.dbSet) {
-        status.textContent = "⚠ Firebase chưa sẵn sàng.";
-        return;
-      }
+      const targetEmail = (document.getElementById("adminTargetEmail").dataset.email || "").toLowerCase();
+      if (!targetEmail) return;
       const parseLimit = (id) => {
         const raw = document.getElementById(id).value.trim();
         if (raw === "") return null;
@@ -1327,8 +1449,23 @@
         updatedBy: (window.currentUserEmail || "").toLowerCase()
       };
       status.textContent = "Đang lưu...";
-      window.dbSet(window.dbRef(window.db, "liber_limits/" + adminTargetKey), payload)
-        .then(() => {
+      quotaRequest("/quota", "POST", {
+        email: targetEmail,
+        imageLimit: payload.imageLimit,
+        chatLimit: payload.chatLimit
+      })
+        .then((data) => {
+          const record = (data && data.limits) || payload;
+          adminLimitSources.server = Object.assign({}, adminLimitSources.server || {}, {
+            [adminTargetKey]: record
+          });
+          mergeAdminLimitTrees();
+          if ((window.currentUserEmail || "").toLowerCase() === targetEmail) {
+            setMyServerQuota(record);
+          }
+          if (window.db && window.dbSet) {
+            writeWithFallback(LIMIT_SOURCES, adminTargetKey, record).catch(() => {});
+          }
           status.textContent = "✓ Đã lưu. Tài khoản kia nhận ngay.";
           setTimeout(() => { if (status.textContent.indexOf("✓") === 0) status.textContent = ""; }, 3000);
         })
@@ -1488,12 +1625,15 @@
         const email = (window.currentUserEmail || "").toLowerCase();
         subscribeLimits(email);
         registerAccount(email);
+        startQuotaPolling();
         refreshQuotaInfo();
         refreshChatQuotaInfo();
         startCooldown();
         refreshAdminVisibility();
       } else {
         stopCooldown();
+        stopQuotaPolling();
+        myServerQuota = null;
         unsubscribeLimits();
         window.liberLimits = { configured: false, imageLimit: null, chatLimit: null };
         refreshChatQuotaInfo();
@@ -1586,10 +1726,25 @@
       });
     }
 
-    function clearFirebaseLogs() {
+    function readSnapshotOnce(path) {
+      return new Promise((resolve) => {
+        if (!window.db || !window.dbOnValue) return resolve({});
+        let unsub = null;
+        unsub = window.dbOnValue(window.dbRef(window.db, path), (snap) => {
+          resolve(snap.val() || {});
+          if (typeof unsub === "function") unsub();
+        }, () => resolve({}));
+      });
+    }
+
+    async function clearFirebaseLogs() {
       if (!confirm("Xác nhận xóa sạch toàn bộ nhật ký lưu trữ?")) return;
-      window.dbRemove(window.dbRef(window.db, 'liber_chats'));
-      window.dbRemove(window.dbRef(window.db, 'liber_media'));
+      for (const path of ["liber_chats", "liber_media"]) {
+        const data = await readSnapshotOnce(path);
+        Object.keys(data || {}).forEach((k) => {
+          if (!k.startsWith("__")) window.dbRemove(window.dbRef(window.db, path + "/" + k));
+        });
+      }
       historyListContainer.innerHTML = `<div style="color:var(--text-muted); font-size:0.8rem;">Dữ liệu đã được dọn sạch hoàn toàn.</div>`;
     }
 
@@ -1599,9 +1754,13 @@
         historyListContainer.innerHTML = `<div style="color:var(--text-muted); font-size:0.8rem;">Chưa có bản ghi nào trên đám mây.</div>`;
         return;
       }
-      const keys = Object.keys(chatData).reverse().slice(0, 30);
+      const keys = Object.keys(chatData)
+        .filter((k) => !k.startsWith("__"))
+        .reverse()
+        .slice(0, 30);
       keys.forEach(k => {
         const item = chatData[k];
+        if (!item || typeof item !== "object" || typeof item.role !== "string" || typeof item.content !== "string") return;
         const div = document.createElement("div");
         div.style.cssText = "background:#100101;border:1px solid rgba(255,26,26,0.3);padding:10px 14px;border-radius:2px;display:flex;justify-content:space-between;align-items:center;font-size:0.8rem;";
         div.innerHTML = `
